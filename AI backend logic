@@ -1,0 +1,47 @@
+import { OpenAI } from "openai";
+import { storage } from "./storage";
+import { api } from "@shared/routes";
+
+const openai = new OpenAI({ 
+  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+  baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+});
+
+export async function registerRoutes(httpServer, app) {
+  app.get(api.chat.history.path, async (req, res) => {
+    const history = await storage.getMessages();
+    res.json(history);
+  });
+
+  app.post(api.chat.send.path, async (req, res) => {
+    const { message } = api.chat.send.input.parse(req.body);
+    await storage.createMessage({ role: "user", content: message });
+
+    const history = await storage.getMessages();
+    const recentHistory = history.slice(-10).map(m => ({
+      role: m.role as "user" | "assistant",
+      content: m.content
+    }));
+
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [
+        {
+          role: "system",
+          content: "You are a helpful medical assistant AI. Provide preliminary guidance but always include a disclaimer that you are not a doctor. For emergencies, tell the user to call 911."
+        },
+        ...recentHistory,
+        { role: "user", content: message }
+      ],
+    });
+
+    const assistantMessage = await storage.createMessage({
+      role: "assistant",
+      content: response.choices[0].message.content || "Error generating response"
+    });
+
+    res.json(assistantMessage);
+  });
+
+  return httpServer;
+}

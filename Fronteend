@@ -1,0 +1,20 @@
+import { ChatInput } from "@/components/ChatInput";
+import { ChatMessage } from "@/components/ChatMessage";
+import { useChatHistory, useSendMessage } from "@/hooks/use-chat";
+
+export default function Home() {
+  const { data: messages, isLoading } = useChatHistory();
+  const { mutate: sendMessage, isPending } = useSendMessage();
+
+  return (
+    <div className="flex flex-col h-screen bg-slate-50">
+      <main className="flex-1 overflow-y-auto p-4">
+        {messages?.map((msg) => (
+          <ChatMessage key={msg.id} role={msg.role} content={msg.content} />
+        ))}
+        {isPending && <div className="p-4 text-slate-400">Assistant is thinking...</div>}
+      </main>
+      <ChatInput onSend={(msg) => sendMessage(msg)} isLoading={isPending} />
+    </div>
+  );
+}
